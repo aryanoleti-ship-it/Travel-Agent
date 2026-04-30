@@ -50,9 +50,9 @@ textarea{resize:vertical}
 .landing-bg-art::before{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(201,169,110,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(201,169,110,0.03) 1px,transparent 1px);background-size:60px 60px}
 .landing-bg-art::after{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(201,169,110,0.08) 0%,transparent 60%),radial-gradient(ellipse at 80% 20%,rgba(78,205,196,0.05) 0%,transparent 50%)}
 .landing-card{position:relative;z-index:1;text-align:center;max-width:560px;padding:0 24px}
-.landing-logo{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:40px}
-.landing-icon{width:52px;height:52px;background:linear-gradient(135deg,var(--gold),var(--gold-l));border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 8px 32px rgba(201,169,110,0.3)}
-.landing-brand{font-family:'Cormorant Garamond',serif;font-size:38px;font-weight:600;color:#F0EDE8;letter-spacing:1px}
+.landing-logo{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:40px}
+.landing-icon{width:72px;height:72px;background:linear-gradient(135deg,var(--gold),var(--gold-l));border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 8px 32px rgba(201,169,110,0.3)}
+.landing-brand{font-family:'Cormorant Garamond',serif;font-size:56px;font-weight:600;color:#F0EDE8;letter-spacing:1px}
 .landing-quote{font-family:'Cormorant Garamond',serif;font-size:22px;font-style:italic;color:rgba(240,237,232,0.7);margin-bottom:8px;line-height:1.4}
 .landing-subquote{font-size:12px;color:rgba(240,237,232,0.35);margin-bottom:48px;letter-spacing:.5px;font-family:'DM Sans',sans-serif}
 .landing-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
@@ -1392,7 +1392,6 @@ function renderCards(list){
 
 function renderGrid(){
   const q = S.searchQuery.toLowerCase();
-  if(q.length > 1) addRecentSearch(S.searchQuery);
   const filtered = ALL_DESTINATIONS.filter(c=>{
     const rm = S.activeRegion==='All' || c.region===S.activeRegion;
     const sm = !q || c.name.toLowerCase().includes(q) || c.tags.some(t=>t.toLowerCase().includes(q)) || c.desc.toLowerCase().includes(q);
@@ -1646,7 +1645,8 @@ function renderIBStep2(){
 
 function toggleLocSummary(id){
   const el = document.getElementById('loc-summary-'+id);
-  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+  if(!el) return;
+  el.style.display = el.style.display==='none' || el.style.display==='' ? 'block' : 'none';
 }
 
 const LOCATION_SUMMARIES = {
@@ -2237,7 +2237,7 @@ function buildChatPage(){
     container.querySelector('#send-btn')?.addEventListener('click', sendChat);
     container.querySelector('#chat-ta')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat();}});
     container.querySelector('#chat-ta')?.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';});
-    container.querySelectorAll('[data-country]').forEach(el=>el.addEventListener('click',()=>{const co=ALL_DESTINATIONS.find(x=>x.id===el.dataset.country);if(co){S.selectedCountry=co;render();}}));
+    container.querySelectorAll('[data-country]').forEach(el=>el.addEventListener('click',function(){const co=ALL_DESTINATIONS.find(x=>x.id===this.dataset.country);if(co){S.selectedCountry=co;IB.step=1;addRecentSearch(co.name);render();}}));
   },60);
   return container;
 }
@@ -2251,8 +2251,13 @@ function appendMsg(m){
   const c=document.getElementById('chat-msgs');if(!c)return;
   const init=(S.user?.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const d=document.createElement('div');d.innerHTML=chatMsgHTML(m,init);
-  c.appendChild(d.firstElementChild);c.scrollTop=c.scrollHeight;
-  d.querySelector('[data-country]')?.addEventListener('click',()=>{const co=ALL_DESTINATIONS.find(x=>x.id===m.countryId);if(co){S.selectedCountry=co;render();}});
+  const el=d.firstElementChild;
+  c.appendChild(el);c.scrollTop=c.scrollHeight;
+  // Bind plan pill AFTER appending to DOM
+  el.querySelector('[data-country]')?.addEventListener('click',function(){
+    const co=ALL_DESTINATIONS.find(x=>x.id===this.dataset.country);
+    if(co){S.selectedCountry=co;IB.step=1;addRecentSearch(co.name);render();}
+  });
 }
 function showTyping(){const c=document.getElementById('chat-msgs');if(!c)return;const d=document.createElement('div');d.id='ai-typ';d.className='msg';d.innerHTML=`<div class="msg-av ai-av">✈</div><div class="msg-bubble ai-bubble"><div style="display:flex;gap:4px;padding:2px 0"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>`;c.appendChild(d);c.scrollTop=c.scrollHeight;}
 function removeTyping(){document.getElementById('ai-typ')?.remove();}
@@ -2263,7 +2268,7 @@ async function sendChat(){
   const ta=document.getElementById('chat-ta');
   const msg=(ta?.value||'').trim();if(!msg)return;
   ta.value='';ta.style.height='';
-  addRecentSearch(msg);
+  // Don't add chat messages to recently viewed — only country views are tracked
   const um={role:'user',text:msg};S.chat.push(um);saveData();appendMsg(um);
   showTyping();
   let reply='Sorry, I couldn\'t connect right now. Please try again.';

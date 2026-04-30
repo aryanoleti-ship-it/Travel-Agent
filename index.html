@@ -1328,17 +1328,6 @@ function renderHome(){
     </div>
     <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Get AI recommendations</button>
   </div>` : ''}
-  ${recentSearches.length ? `
-  <div style="margin:0 0 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px">
-    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;font-weight:600;letter-spacing:.8px;text-transform:uppercase">Recently Viewed</div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px">
-      ${recentSearches.map(r=>`
-      <div class="recent-chip" onclick="S.searchQuery='${r}';render()" style="padding:8px 16px;font-size:13px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;gap:7px;cursor:pointer;transition:all .15s">
-        <span style="font-size:16px">${ALL_DESTINATIONS.find(c=>c.name.toLowerCase()===r.toLowerCase())?.flag||'🕐'}</span>
-        <span style="color:var(--text2);font-weight:500">${r}</span>
-      </div>`).join('')}
-    </div>
-  </div>` : ''}
   ${S.savedItineraryCountry && IB.generatedPlan ? `
   <div style="background:linear-gradient(135deg,var(--gold-dim),var(--gold-dim2));border:1px solid rgba(201,169,110,.3);border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
     <div style="font-size:32px">${S.savedItineraryCountry.flag}</div>
@@ -1455,18 +1444,26 @@ function renderTripPlan(){
     </div>
 
     <!-- SAMPLE ITINERARY (pre-built, if available) -->
-    ${c.days && c.days.length ? `
-    <div style="font-family:'Cormorant Garamond',serif;font-size:20px;margin-bottom:14px">Sample Itinerary</div>
-    ${c.days.map((day,i)=>`
-    <div class="day-card">
-      <div class="day-header"><div class="day-num">${i+1}</div><div><div class="day-title">${day.title}</div><div class="day-sub">${day.sub}</div></div></div>
-      <div class="day-body">${day.activities.map(a=>`
-      <div class="activity">
-        <div class="act-time">${a.time}</div>
-        <div class="act-icon">${a.icon}</div>
-        <div><div class="act-name">${a.name}</div><div class="act-desc">${a.desc}</div>${a.tip?`<div class="act-tip">💡 ${a.tip}</div>`:''}</div>
-      </div>`).join('')}</div>
-    </div>`).join('')}` : ''}
+    ${c.days && c.days.length && !IB.generatedPlan ? `
+    <details style="margin-bottom:12px">
+      <summary style="font-family:'Cormorant Garamond',serif;font-size:18px;cursor:pointer;padding:14px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;list-style:none;display:flex;align-items:center;justify-content:space-between;color:var(--text2)">
+        <span>📋 Sample Itinerary Preview</span>
+        <span style="font-size:12px;font-family:'DM Sans',sans-serif;color:var(--text3)">Click to expand ▾</span>
+      </summary>
+      <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:16px">
+        <div style="font-size:12px;color:var(--text3);font-family:'DM Sans',sans-serif;margin-bottom:12px">This is a sample — use the Itinerary Builder above to generate your personalised AI plan.</div>
+        ${c.days.map((day,i)=>`
+        <div class="day-card">
+          <div class="day-header"><div class="day-num">${i+1}</div><div><div class="day-title">${day.title}</div><div class="day-sub">${day.sub}</div></div></div>
+          <div class="day-body">${day.activities.map(a=>`
+          <div class="activity">
+            <div class="act-time">${a.time}</div>
+            <div class="act-icon">${a.icon}</div>
+            <div><div class="act-name">${a.name}</div><div class="act-desc">${a.desc}</div>${a.tip?`<div class="act-tip">💡 ${a.tip}</div>`:''}</div>
+          </div>`).join('')}</div>
+        </div>`).join('')}
+      </div>
+    </details>` : ''}
   </div>`;
 }
 
@@ -2035,10 +2032,11 @@ async function itinChatSend(quickMsg){
   if(!IB.itineraryChat) IB.itineraryChat = [];
   IB.itineraryChat.push({role:'user', text:msg});
 
-  // Show user message immediately
   const msgsEl = document.getElementById('itin-chat-msgs');
+  const init = (S.user?.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  // Show user message
   if(msgsEl){
-    const init = (S.user?.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const userDiv = document.createElement('div');
     userDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start;flex-direction:row-reverse';
     userDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:var(--surface3);color:var(--text2)">${init}</div><div style="max-width:85%;padding:9px 13px;border-radius:12px 12px 4px 12px;font-size:13px;line-height:1.65;background:var(--gold-dim);color:var(--gold-l);border:1px solid rgba(201,169,110,.2)">${msg}</div>`;
@@ -2053,37 +2051,65 @@ async function itinChatSend(quickMsg){
   }
 
   const c = S.selectedCountry;
-  const systemPrompt = `You are an expert travel planner helping refine an existing ${IB.days}-day itinerary for ${c?.name||'the destination'}. The user has already generated their itinerary and wants to make specific changes. When they ask to change something, provide the updated day(s) in the same format as the original (DAY X: Title, MORNING:, AFTERNOON:, EVENING:, TIP:). Be specific, practical and use real place names. Keep responses concise and actionable.`;
-  const contextMsg = `Current itinerary context:\n${IB.generatedPlan?.slice(0,1500)||'No itinerary yet'}\n\nUser request: ${msg}`;
+  const systemPrompt = `You are an expert travel planner. The user has an existing ${IB.days}-day itinerary for ${c?.name||'the destination'} and wants to modify it. 
 
-  let reply = 'Sorry, I couldn\'t connect. Please try again.';
+CRITICAL INSTRUCTIONS:
+- Return the COMPLETE updated itinerary with ALL ${IB.days} days, not just the changed days
+- Use the EXACT same format as the original: DAY X: Title, WEATHER: ..., MORNING: ..., AFTERNOON: ..., EVENING: ..., TIP: ..., ---
+- Apply the user's requested changes and keep everything else the same
+- Do NOT add commentary, explanations or chat — return ONLY the full itinerary in the exact format
+- End with PACKING TIPS: section as before`;
+
+  const contextMsg = `Here is the current full itinerary:\n\n${IB.generatedPlan||'No itinerary yet'}\n\nUser modification request: ${msg}\n\nReturn the complete updated itinerary with all ${IB.days} days in the exact same format.`;
+
+  let updatedPlan = null;
+  let statusMsg = 'Sorry, I couldn\'t connect. Please try again.';
+
   try{
     const GROQ_KEY = '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';
-    const hist = IB.itineraryChat.slice(-6).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.text}));
     const resp = await fetch('https://api.groq.com/openai/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
       body:JSON.stringify({
         model:'llama-3.3-70b-versatile',
-        max_tokens:1200,
+        max_tokens:3000,
         temperature:0.7,
-        messages:[{role:'system',content:systemPrompt},{role:'user',content:contextMsg},...hist.slice(1)]
+        messages:[
+          {role:'system',content:systemPrompt},
+          {role:'user',content:contextMsg}
+        ]
       })
     });
     const data = await resp.json();
-    if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
-  }catch(e){ reply = 'Connection error. Check your internet and try again.'; }
+    if(data.choices?.[0]?.message?.content){
+      updatedPlan = data.choices[0].message.content;
+      statusMsg = '✅ Itinerary updated! Changes applied above.';
+    }
+  }catch(e){ statusMsg = 'Connection error. Check your internet and try again.'; }
 
   document.getElementById('itin-typ')?.remove();
-  IB.itineraryChat.push({role:'ai', text:reply});
-  saveData();
+  IB.itineraryChat.push({role:'ai', text:statusMsg});
 
-  if(msgsEl){
-    const aiDiv = document.createElement('div');
-    aiDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start';
-    aiDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));display:flex;align-items:center;justify-content:center;font-size:11px;color:#0A0C0F;flex-shrink:0">✦</div><div style="max-width:85%;padding:9px 13px;border-radius:12px 12px 12px 4px;font-size:13px;line-height:1.65;white-space:pre-line;background:var(--surface2);color:var(--text);border:1px solid var(--border)">${reply}</div>`;
-    msgsEl.appendChild(aiDiv);
-    msgsEl.scrollTop = msgsEl.scrollHeight;
+  if(updatedPlan){
+    // Update the itinerary directly and re-render
+    IB.generatedPlan = updatedPlan;
+    saveData();
+    renderGeneratedPlan(updatedPlan);
+    // Re-scroll chat to bottom after re-render
+    setTimeout(()=>{
+      const newMsgs = document.getElementById('itin-chat-msgs');
+      if(newMsgs) newMsgs.scrollTop = newMsgs.scrollHeight;
+    }, 100);
+  } else {
+    // Only show error in chat if update failed
+    saveData();
+    if(msgsEl){
+      const aiDiv = document.createElement('div');
+      aiDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start';
+      aiDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));display:flex;align-items:center;justify-content:center;font-size:11px;color:#0A0C0F;flex-shrink:0">✦</div><div style="max-width:85%;padding:9px 13px;border-radius:12px 12px 12px 4px;font-size:13px;line-height:1.65;background:var(--surface2);color:var(--text);border:1px solid var(--border)">${statusMsg}</div>`;
+      msgsEl.appendChild(aiDiv);
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
   }
 }
 

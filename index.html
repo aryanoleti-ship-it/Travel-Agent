@@ -725,6 +725,21 @@ function loginAs(email, userData){
   S.chat = userData.chat || [];
   S.packingChecked = userData.packingChecked || {};
   S.budget = userData.budget || {days:7, budget:2000};
+  // Restore saved itinerary
+  if(userData.savedItinerary){
+    const si = userData.savedItinerary;
+    IB.generatedPlan = si.plan;
+    IB.days = si.days||7;
+    IB.startDate = si.startDate||'';
+    IB.interests = si.interests||[];
+    IB.locations = si.locations||[];
+    IB.pace = si.pace||'moderate';
+    IB.itineraryChat = si.itineraryChat||[];
+    if(si.country){
+      const found = ALL_DESTINATIONS.find(c=>c.id===si.country);
+      if(found) S.savedItineraryCountry = found;
+    }
+  }
   render();
 }
 
@@ -748,6 +763,19 @@ function saveData(){
   S.userData.chat = S.chat;
   S.userData.packingChecked = S.packingChecked;
   S.userData.budget = S.budget;
+  // Persist itinerary plan
+  if(IB.generatedPlan){
+    S.userData.savedItinerary = {
+      plan: IB.generatedPlan,
+      country: S.selectedCountry?.id,
+      days: IB.days,
+      startDate: IB.startDate,
+      interests: IB.interests,
+      locations: IB.locations,
+      pace: IB.pace,
+      itineraryChat: IB.itineraryChat||[]
+    };
+  }
   saveUserData(S.user.email, S.userData);
 }
 
@@ -1300,7 +1328,29 @@ function renderHome(){
     </div>
     <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Get AI recommendations</button>
   </div>` : ''}
-  ${recentSearches.length ? `<div style="margin-bottom:16px"><div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-weight:500;letter-spacing:.5px;text-transform:uppercase">Recent searches</div><div class="recent-row">${recentSearches.map(r=>`<div class="recent-chip" onclick="S.searchQuery='${r}';render()">🕐 ${r}</div>`).join('')}</div></div>` : ''}
+  ${recentSearches.length ? `
+  <div style="margin:0 0 20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px 20px">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:12px;font-weight:600;letter-spacing:.8px;text-transform:uppercase">Recently Viewed</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">
+      ${recentSearches.map(r=>`
+      <div class="recent-chip" onclick="S.searchQuery='${r}';render()" style="padding:8px 16px;font-size:13px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;gap:7px;cursor:pointer;transition:all .15s">
+        <span style="font-size:16px">${ALL_DESTINATIONS.find(c=>c.name.toLowerCase()===r.toLowerCase())?.flag||'🕐'}</span>
+        <span style="color:var(--text2);font-weight:500">${r}</span>
+      </div>`).join('')}
+    </div>
+  </div>` : ''}
+  ${S.savedItineraryCountry && IB.generatedPlan ? `
+  <div style="background:linear-gradient(135deg,var(--gold-dim),var(--gold-dim2));border:1px solid rgba(201,169,110,.3);border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="font-size:32px">${S.savedItineraryCountry.flag}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:600;color:var(--gold-l);font-family:'DM Sans',sans-serif">Pick up where you left off</div>
+      <div style="font-size:12.5px;color:var(--text2);margin-top:3px;font-family:'DM Sans',sans-serif">You were planning a ${IB.days}-day trip to <strong style="color:var(--text)">${S.savedItineraryCountry.name}</strong>${IB.startDate?' starting '+IB.startDate:''}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-gold btn-sm" onclick="S.selectedCountry=S.savedItineraryCountry;IB.step=5;render()">Resume Planning →</button>
+      <button class="btn btn-ghost btn-sm" onclick="IB.generatedPlan=null;S.savedItineraryCountry=null;S.userData.savedItinerary=null;saveData();render()">Start Fresh</button>
+    </div>
+  </div>` : ''}
   <div class="hero">
     <div class="hero-bg"></div><div class="hero-grid"></div>
     <div class="hero-content">
@@ -1355,6 +1405,12 @@ function renderGrid(){
 function selectCountry(id){
   S.selectedCountry = ALL_DESTINATIONS.find(c=>c.id===id);
   if(S.selectedCountry) addRecentSearch(S.selectedCountry.name);
+  // If this country has a saved itinerary, reset IB step to show it
+  if(S.userData?.savedItinerary?.country === id && IB.generatedPlan){
+    IB.step = 5;
+  } else {
+    IB.step = 1;
+  }
   render();
 }
 
@@ -1588,6 +1644,74 @@ function renderIBStep2(){
   </div>`;
 }
 
+function toggleLocSummary(id){
+  const el = document.getElementById('loc-summary-'+id);
+  if(el) el.style.display = el.style.display==='none' ? 'block' : 'none';
+}
+
+const LOCATION_SUMMARIES = {
+  // France
+  'Eiffel Tower & Paris': 'The iron lattice tower built in 1889 stands 330m tall. Best visited at dusk when the city glows gold. The surrounding Champ de Mars park is perfect for a picnic.',
+  'Palace of Versailles': 'Louis XIV\'s opulent royal palace 20km from Paris. The Hall of Mirrors stretches 73m with 357 mirrors. The gardens cover 800 hectares — allow a full day.',
+  'Mont Saint-Michel': 'A tidal island abbey rising dramatically from the sea in Normandy. The medieval monastery dates to 966 AD. Accessible by causeway — time your visit around the tides.',
+  'Loire Valley Châteaux': 'Over 300 châteaux line this UNESCO valley — Chambord, Chenonceau and Amboise are the must-sees. Best explored by bicycle between wine tastings.',
+  'Côte d\'Azur': 'The French Riviera stretches from Nice to Monaco. Glamorous beaches, yacht-filled harbours, and the world\'s most expensive real estate. Visit Nice\'s Old Town and Antibes.',
+  'Normandy Beaches': 'The D-Day landing beaches of WWII — Utah, Omaha, Gold, Juno and Sword. The American Cemetery at Colleville-sur-Mer is profoundly moving. Essential history.',
+  // Japan
+  'Tokyo': 'The world\'s largest city blends ancient temples with neon-lit skyscrapers. Shibuya crossing, Senso-ji temple, Harajuku fashion and the best ramen on Earth.',
+  'Kyoto Temples': 'Japan\'s ancient capital has 1,600 Buddhist temples and 400 Shinto shrines. Fushimi Inari\'s torii gates, Kinkaku-ji golden pavilion and Arashiyama bamboo grove.',
+  'Mount Fuji': 'Japan\'s sacred 3,776m volcano is best viewed from Hakone or Lake Kawaguchi. Climbing season is July-August. The sunrise from the summit is life-changing.',
+  'Hiroshima': 'The Peace Memorial Park and Museum document the 1945 atomic bombing with profound dignity. The nearby Miyajima island with its floating torii gate is unmissable.',
+  'Osaka Street Food': 'Japan\'s kitchen — takoyaki (octopus balls), okonomiyaki (savoury pancakes) and kushikatsu (fried skewers). Dotonbori canal district is the epicentre.',
+  'Nara Deer Park': '1,200 wild deer roam freely through this ancient capital. They bow for deer crackers. Todai-ji temple houses Japan\'s largest bronze Buddha statue.',
+  // Italy
+  'Rome\'s Colosseum': 'The 2,000-year-old amphitheatre held 80,000 spectators for gladiatorial combat. Book skip-the-line tickets. The adjacent Roman Forum is included in the same ticket.',
+  'Vatican City': 'The world\'s smallest country contains Michelangelo\'s Sistine Chapel ceiling, St. Peter\'s Basilica and the Vatican Museums. Book the earliest entry slot available.',
+  'Venice Canals': 'Built on 118 islands connected by 400 bridges. A gondola ride is touristy but magical. Visit in November for fewer crowds. The Rialto Market opens at 7am.',
+  'Amalfi Coast': 'A 50km stretch of dramatic cliffs, pastel villages and turquoise sea. Positano, Ravello and Amalfi town are the highlights. Drive the coastal road at sunrise.',
+  'Tuscany': 'Rolling hills, cypress trees, medieval hilltop towns and world-class Chianti wine. Siena\'s Piazza del Campo, San Gimignano\'s towers and Pienza\'s cheese.',
+  'Florence Uffizi': 'The world\'s greatest Renaissance art collection — Botticelli\'s Birth of Venus, da Vinci, Raphael and Michelangelo\'s David (in the Accademia). Book months ahead.',
+  // USA
+  'New York City': 'The city that never sleeps — Central Park, the Met, Brooklyn Bridge, Times Square and the best pizza outside Naples. The High Line elevated park is a hidden gem.',
+  'Grand Canyon': 'One mile deep, 277 miles long. The South Rim is most accessible. Sunrise and sunset paint the canyon in extraordinary colours. Helicopter tours are spectacular.',
+  'Yellowstone': 'The world\'s first national park sits atop a supervolcano. Old Faithful geyser erupts every 90 minutes. Bison, wolves and grizzly bears roam freely.',
+  'San Francisco': 'The Golden Gate Bridge, Alcatraz island, cable cars and the world\'s best sourdough bread. The Mission District\'s murals and Chinatown are essential.',
+  'New Orleans': 'Jazz birthplace, Mardi Gras, beignets at Café Du Monde, voodoo history and the most unique food culture in America. The French Quarter never sleeps.',
+  'Yosemite': 'El Capitan\'s 900m granite face, Half Dome, Yosemite Falls and ancient sequoia groves. Book accommodation 6 months ahead — it sells out completely.',
+  // India
+  'Taj Mahal': 'Shah Jahan\'s white marble mausoleum built for his wife Mumtaz. Arrive before 6am for the golden sunrise light. The reflection pool creates the iconic mirror image.',
+  'Varanasi Ghats': 'Hinduism\'s holiest city on the Ganges. The evening Ganga Aarti fire ceremony is extraordinary. Boat rides at dawn past the burning ghats are unforgettable.',
+  'Rajasthan Palaces': 'The Pink City of Jaipur, Blue City of Jodhpur and golden Jaisalmer fort rising from the Thar Desert. Camel safaris into the dunes at sunset.',
+  'Kerala Backwaters': 'A network of lagoons, lakes and canals along the Arabian Sea coast. Overnight houseboat stays through rice paddies and coconut groves are magical.',
+  'Goa Beaches': 'India\'s beach paradise — North Goa for parties and nightlife, South Goa for quiet coves. Portuguese colonial architecture in Old Goa is a UNESCO site.',
+  'Mumbai': 'India\'s financial capital — the Gateway of India, Dharavi slum tours, Bollywood studios, street food at Chowpatty Beach and the colonial Victoria Terminus.',
+  // Greece
+  'Acropolis of Athens': 'The 2,500-year-old Parthenon crowns the sacred rock above Athens. The Acropolis Museum below houses the original friezes. Go at opening time.',
+  'Santorini': 'The iconic white-and-blue clifftop villages of Oia and Fira above the volcanic caldera. Sunset from Oia is one of the world\'s most photographed moments.',
+  'Mykonos': 'The cosmopolitan party island with windmills, Little Venice and world-famous beach clubs. Quieter in May and September.',
+  'Delphi': 'The ancient oracle site on Mount Parnassus where Greeks sought prophecy. The Temple of Apollo and the Tholos are remarkably preserved.',
+  'Meteora': 'Six Orthodox monasteries perched impossibly on top of towering rock pillars in central Greece. A UNESCO site and one of Europe\'s most dramatic landscapes.',
+  'Rhodes Old Town': 'The best-preserved medieval walled city in Europe. The Street of the Knights, Palace of the Grand Master and the ancient Acropolis of Lindos.',
+  // Egypt
+  'Pyramids of Giza': 'The last surviving ancient wonder — Khufu\'s Great Pyramid stood as the world\'s tallest structure for 3,800 years. The Sphinx guards the plateau.',
+  'Valley of the Kings': 'The royal necropolis of New Kingdom pharaohs near Luxor. Tutankhamun\'s tomb is here. The painted walls of Ramesses VI\'s tomb are extraordinary.',
+  'Abu Simbel': 'Ramesses II\'s colossal rock temples relocated to save them from the Aswan Dam. The sun illuminates the inner sanctuary twice a year on precise dates.',
+  'Nile Cruise': 'A 4-7 day felucca or cruise ship journey between Luxor and Aswan passing ancient temples, villages and desert landscapes unchanged for millennia.',
+  'Luxor': 'The world\'s greatest open-air museum — Karnak Temple complex, Luxor Temple and the Valley of the Kings all within reach. Allow 3 days minimum.',
+  'Aswan': 'The Nubian city at the first Nile cataract. Philae Temple on its island, the unfinished obelisk and sunset felucca rides are the highlights.',
+};
+
+function getLocationSummary(countryId, locationName){
+  if(LOCATION_SUMMARIES[locationName]) return LOCATION_SUMMARIES[locationName];
+  // Generic fallback based on tag type
+  if(locationName.toLowerCase().includes('beach')) return 'A beautiful coastal destination with clear waters and scenic views. Best visited in the morning for calmer conditions and fewer crowds.';
+  if(locationName.toLowerCase().includes('market')) return 'A vibrant local market offering authentic food, crafts and a window into daily life. Arrive early for the freshest produce and best atmosphere.';
+  if(locationName.toLowerCase().includes('temple') || locationName.toLowerCase().includes('shrine')) return 'An important religious and cultural site with significant historical heritage. Dress modestly and visit early morning for a more peaceful experience.';
+  if(locationName.toLowerCase().includes('museum')) return 'A world-class collection showcasing the region\'s art, history and culture. Allow 2-3 hours minimum and book tickets in advance to skip queues.';
+  if(locationName.toLowerCase().includes('national park') || locationName.toLowerCase().includes('nature')) return 'A protected natural area with exceptional wildlife, landscapes and hiking trails. Guided tours are recommended for the best wildlife sightings.';
+  return 'A must-visit destination in this country, offering a unique blend of culture, history and local experiences. Ask your AI coach for specific tips.';
+}
+
 function renderIBStep3(){
   const c = S.selectedCountry;
   const profile = S.userData?.profile;
@@ -1610,12 +1734,20 @@ function renderIBStep3(){
     <div class="ib-section-title">Choose your locations</div>
     <div class="ib-section-sub">Select the places you want to visit. We've pre-selected the top highlights — adjust to fit your itinerary.${profile?' Based on your travel style ('+profile.travelersType+', '+IB.days+' days).':''}</div>
     <div class="ib-locations">
-      ${allLocs.map(({name,icon,tag})=>`
-      <div class="ib-loc${IB.locations.includes(name)?' sel':''}" onclick="ibToggleLocation('${name.replace(/'/g,"\\'")}',this)">
-        <div class="ib-loc-check">✓</div>
-        <div class="ib-loc-icon">${icon}</div>
-        <div style="flex:1"><div class="ib-loc-name">${name}</div><div class="ib-loc-tag">${tag}</div></div>
-      </div>`).join('')}
+      ${allLocs.map(({name,icon,tag})=>{
+        const summary = getLocationSummary(c.id, name);
+        const safeId = name.replace(/[^a-zA-Z0-9]/g,'_');
+        return `
+      <div class="ib-loc${IB.locations.includes(name)?' sel':''}" onclick="ibToggleLocation('${name.replace(/'/g,"\\'")}',this)" style="flex-direction:column;align-items:flex-start;gap:6px">
+        <div style="display:flex;align-items:center;gap:10px;width:100%">
+          <div class="ib-loc-check">✓</div>
+          <div class="ib-loc-icon">${icon}</div>
+          <div style="flex:1"><div class="ib-loc-name">${name}</div><div class="ib-loc-tag">${tag}</div></div>
+          <button onclick="event.stopPropagation();toggleLocSummary('${safeId}')" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px;font-family:'DM Sans',sans-serif;white-space:nowrap">ℹ Info</button>
+        </div>
+        <div id="loc-summary-${safeId}" style="display:none;font-size:12px;color:var(--text2);line-height:1.6;padding:8px 10px;background:var(--surface3);border-radius:7px;width:100%;font-family:'DM Sans',sans-serif">${summary}</div>
+      </div>`;
+      }).join('')}
     </div>
     <div style="font-size:11.5px;color:var(--text3);font-family:'DM Sans',sans-serif">${IB.locations.length} location${IB.locations.length!==1?'s':''} selected</div>
     <div class="ib-nav">
@@ -1644,6 +1776,7 @@ function ibGoStep(step){
   else if(step===2) el.innerHTML = renderIBStep2();
   else if(step===3) el.innerHTML = renderIBStep3();
   else if(step===4){ el.innerHTML = renderIBLoading(); generateItinerary(); }
+  else if(step===5 && IB.generatedPlan){ renderGeneratedPlan(IB.generatedPlan); }
 }
 
 function ibToggleInterest(label, el){
@@ -1857,7 +1990,101 @@ function renderGeneratedPlan(text){
       <div class="day-header"><div style="font-size:16px">🧳</div><div><div class="day-title">Packing Tips for ${c.name}</div></div></div>
       <div class="day-body" style="font-size:12.5px;color:var(--text2);line-height:1.8;white-space:pre-line">${packingText.replace(/PACKING TIPS[:\s]*/i,'').trim()}</div>
     </div>`:''}
+
+    <!-- INLINE ITINERARY CHAT -->
+    <div style="margin-top:20px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px">
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,var(--gold),var(--gold-l));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">✦</div>
+        <div>
+          <div style="font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif">Refine your itinerary</div>
+          <div style="font-size:11.5px;color:var(--text3);font-family:'DM Sans',sans-serif">Ask me to change days, add activities, adjust budget or anything else</div>
+        </div>
+      </div>
+      <div id="itin-chat-msgs" style="max-height:320px;overflow-y:auto;padding:14px 18px;display:flex;flex-direction:column;gap:10px">
+        ${(IB.itineraryChat||[]).map(m=>`
+        <div style="display:flex;gap:9px;align-items:flex-start${m.role==='user'?';flex-direction:row-reverse':''}">
+          <div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:${m.role==='ai'?'linear-gradient(135deg,var(--gold),var(--gold-l));color:#0A0C0F':'var(--surface3);color:var(--text2)'}">${m.role==='ai'?'✦':'Me'}</div>
+          <div style="max-width:85%;padding:9px 13px;border-radius:${m.role==='ai'?'12px 12px 12px 4px':'12px 12px 4px 12px'};font-size:13px;line-height:1.65;white-space:pre-line;background:${m.role==='ai'?'var(--surface2)':'var(--gold-dim)'};color:${m.role==='ai'?'var(--text)':'var(--gold-l)'};border:1px solid ${m.role==='ai'?'var(--border)':'rgba(201,169,110,.2)'}">${m.text}</div>
+        </div>`).join('')}
+        ${!(IB.itineraryChat||[]).length?`<div style="text-align:center;padding:16px;color:var(--text3);font-size:12.5px;font-family:'DM Sans',sans-serif">Ask me to change anything about your itinerary ↓</div>`:''}
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;padding:10px 18px 0;border-top:1px solid var(--border)">
+        ${['Add a rest day','Make it more budget-friendly','Add more food experiences','Swap Day 1 activities','Add a day trip','Make it more adventurous'].map(p=>`<button onclick="itinChatSend('${p}')" style="padding:5px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:11.5px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .14s" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">${p}</button>`).join('')}
+      </div>
+      <div style="display:flex;gap:10px;padding:12px 18px;align-items:flex-end">
+        <textarea id="itin-chat-ta" placeholder="e.g. Replace Day 3 with a beach day, add more local food spots, make Day 2 cheaper…" rows="2" style="flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:9px 13px;font-size:13px;resize:none;color:var(--text);outline:none;font-family:'DM Sans',sans-serif;transition:border-color .2s" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border)'"></textarea>
+        <button onclick="itinChatSend()" style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#0A0C0F;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;border:none;flex-shrink:0;align-self:flex-end;transition:all .15s">↑</button>
+      </div>
+    </div>
   </div>`;
+
+  // Bind Enter key for itinerary chat
+  setTimeout(()=>{
+    const ta = document.getElementById('itin-chat-ta');
+    if(ta) ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();itinChatSend();}});
+    const msgs = document.getElementById('itin-chat-msgs');
+    if(msgs) msgs.scrollTop = msgs.scrollHeight;
+  },100);
+}
+
+async function itinChatSend(quickMsg){
+  const ta = document.getElementById('itin-chat-ta');
+  const msg = quickMsg || (ta?.value||'').trim();
+  if(!msg) return;
+  if(ta) { ta.value=''; ta.style.height=''; }
+  if(!IB.itineraryChat) IB.itineraryChat = [];
+  IB.itineraryChat.push({role:'user', text:msg});
+
+  // Show user message immediately
+  const msgsEl = document.getElementById('itin-chat-msgs');
+  if(msgsEl){
+    const init = (S.user?.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const userDiv = document.createElement('div');
+    userDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start;flex-direction:row-reverse';
+    userDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;background:var(--surface3);color:var(--text2)">${init}</div><div style="max-width:85%;padding:9px 13px;border-radius:12px 12px 4px 12px;font-size:13px;line-height:1.65;background:var(--gold-dim);color:var(--gold-l);border:1px solid rgba(201,169,110,.2)">${msg}</div>`;
+    msgsEl.appendChild(userDiv);
+    // Typing indicator
+    const typDiv = document.createElement('div');
+    typDiv.id = 'itin-typ';
+    typDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start';
+    typDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));display:flex;align-items:center;justify-content:center;font-size:11px;color:#0A0C0F">✦</div><div style="padding:9px 13px;background:var(--surface2);border-radius:12px 12px 12px 4px;border:1px solid var(--border)"><div style="display:flex;gap:4px;align-items:center"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>`;
+    msgsEl.appendChild(typDiv);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  const c = S.selectedCountry;
+  const systemPrompt = `You are an expert travel planner helping refine an existing ${IB.days}-day itinerary for ${c?.name||'the destination'}. The user has already generated their itinerary and wants to make specific changes. When they ask to change something, provide the updated day(s) in the same format as the original (DAY X: Title, MORNING:, AFTERNOON:, EVENING:, TIP:). Be specific, practical and use real place names. Keep responses concise and actionable.`;
+  const contextMsg = `Current itinerary context:\n${IB.generatedPlan?.slice(0,1500)||'No itinerary yet'}\n\nUser request: ${msg}`;
+
+  let reply = 'Sorry, I couldn\'t connect. Please try again.';
+  try{
+    const GROQ_KEY = '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';
+    const hist = IB.itineraryChat.slice(-6).map(m=>({role:m.role==='ai'?'assistant':'user',content:m.text}));
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+GROQ_KEY},
+      body:JSON.stringify({
+        model:'llama-3.3-70b-versatile',
+        max_tokens:1200,
+        temperature:0.7,
+        messages:[{role:'system',content:systemPrompt},{role:'user',content:contextMsg},...hist.slice(1)]
+      })
+    });
+    const data = await resp.json();
+    if(data.choices?.[0]?.message?.content) reply = data.choices[0].message.content;
+  }catch(e){ reply = 'Connection error. Check your internet and try again.'; }
+
+  document.getElementById('itin-typ')?.remove();
+  IB.itineraryChat.push({role:'ai', text:reply});
+  saveData();
+
+  if(msgsEl){
+    const aiDiv = document.createElement('div');
+    aiDiv.style.cssText = 'display:flex;gap:9px;align-items:flex-start';
+    aiDiv.innerHTML = `<div style="width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold-l));display:flex;align-items:center;justify-content:center;font-size:11px;color:#0A0C0F;flex-shrink:0">✦</div><div style="max-width:85%;padding:9px 13px;border-radius:12px 12px 12px 4px;font-size:13px;line-height:1.65;white-space:pre-line;background:var(--surface2);color:var(--text);border:1px solid var(--border)">${reply}</div>`;
+    msgsEl.appendChild(aiDiv);
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
 }
 
 function formatDayBody(text){

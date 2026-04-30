@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Voyager — AI Travel Agent</title>
+<title>Pathwise — AI Travel Agent</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -352,7 +352,7 @@ textarea{resize:vertical}
   <div class="landing-card">
     <div class="landing-logo">
       <div class="landing-icon">✈</div>
-      <span class="landing-brand">Voyager</span>
+      <span class="landing-brand">Pathwise</span>
     </div>
     <div class="landing-quote">"The world is a book, and those who do not travel read only one page."</div>
     <div class="landing-subquote">— Saint Augustine</div>
@@ -362,7 +362,7 @@ textarea{resize:vertical}
     </div>
     <div class="landing-features">
       <div class="lf-item"><div class="lf-icon">🌍</div><div class="lf-text">195+ Countries</div></div>
-      <div class="lf-item"><div class="lf-icon">✦</div><div class="lf-text">AI Trip Planner</div></div>
+      <div class="lf-item"><div class="lf-icon">✦</div><div class="lf-text">Kelly AI Planner</div></div>
       <div class="lf-item"><div class="lf-icon">💰</div><div class="lf-text">Budget Tools</div></div>
       <div class="lf-item"><div class="lf-icon">🧳</div><div class="lf-text">Packing Lists</div></div>
     </div>
@@ -400,13 +400,13 @@ textarea{resize:vertical}
 <div class="app" id="app-shell" style="display:none">
   <aside class="sidebar">
     <div class="sidebar-header">
-      <div class="brand"><div class="brand-icon">✈</div><span class="brand-name">Voyager</span></div>
+      <div class="brand"><div class="brand-icon">✈</div><span class="brand-name">Pathwise</span></div>
       <div class="brand-tagline">AI-Powered Travel Agent</div>
     </div>
     <nav class="sidebar-nav" id="sidebar-nav">
       <div class="nav-section-label">Explore</div>
       <button class="nav-btn active" data-page="home"><span class="ni">🌍</span><span>Destinations</span></button>
-      <button class="nav-btn" data-page="chat"><span class="ni">✦</span><span>Ask AI Agent</span></button>
+      <button class="nav-btn" data-page="chat"><span class="ni">✦</span><span>Ask Kelly</span></button>
       <div class="nav-section-label">Plan</div>
       <button class="nav-btn" data-page="budget"><span class="ni">💰</span><span>Budget Planner</span></button>
       <button class="nav-btn" data-page="packing"><span class="ni">🧳</span><span>Packing Lists</span></button>
@@ -426,7 +426,7 @@ textarea{resize:vertical}
       <div class="top-bar-title" id="top-bar-title">Explore the World</div>
       <div class="top-bar-right">
         <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
-        <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Ask AI</button>
+        <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Ask Kelly</button>
         <button class="signout-btn" onclick="signOut()">Sign out</button>
       </div>
     </div>
@@ -1296,12 +1296,19 @@ function firstName(){ return (S.user?.name||'').split(' ')[0] || 'Explorer'; }
 /* ════════ RENDER ENGINE ════════ */
 function render(){
   const el = document.getElementById('page-content');
-  document.getElementById('top-bar-title').textContent = S.selectedCountry ? S.selectedCountry.name : {home:'Explore the World',chat:'AI Travel Agent',budget:'Budget Planner',packing:'Packing Lists'}[S.page]||'Voyager';
+  document.getElementById('top-bar-title').textContent = S.selectedCountry ? S.selectedCountry.name : {home:'Explore the World',chat:'Kelly — AI Travel Agent',budget:'Budget Planner',packing:'Packing Lists'}[S.page]||'Pathwise';
   const w = document.createElement('div');
   w.className = 'fade-in'; w.style.height = '100%';
   if(S.selectedCountry) w.innerHTML = renderTripPlan();
   else if(S.page==='home') w.innerHTML = renderHome();
-  else if(S.page==='budget') w.innerHTML = renderBudget();
+  else if(S.page==='budget'){ w.innerHTML = renderBudget(); el.innerHTML=''; el.appendChild(w); bindEvents(); updateNav();
+    // Pre-select USD→EUR and trigger initial convert
+    setTimeout(()=>{
+      selectCurrency('from','USD');
+      selectCurrency('to','EUR');
+    },100);
+    return;
+  }
   else if(S.page==='packing') w.innerHTML = renderPacking();
   else if(S.page==='chat'){ w.appendChild(buildChatPage()); el.innerHTML=''; el.appendChild(w); bindEvents(); updateNav(); return; }
   el.innerHTML=''; el.appendChild(w);
@@ -1348,7 +1355,7 @@ function renderHome(){
       <p>Personalised trip plans for every country on Earth, powered by AI. From 3-day getaways to month-long expeditions.</p>
       <div class="hero-search">
         <input id="hero-search" placeholder="Search countries, experiences, regions…" value="${S.searchQuery}" oninput="S.searchQuery=this.value;renderGrid()"/>
-        <button class="btn-search" onclick="setPage('chat')">✦ Ask AI Agent</button>
+        <button class="btn-search" onclick="setPage('chat')">✦ Ask Kelly</button>
       </div>
     </div>
   </div>
@@ -2167,8 +2174,277 @@ function renderBudget(){
       </div>
     </div>
     <div id="budget-breakdown">${budgetBreakdown()}</div>
+
+    <!-- CURRENCY CONVERTER -->
+    <div style="margin-top:24px;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,var(--gold),var(--gold-l));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0">💱</div>
+        <div>
+          <div style="font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif">Currency Converter</div>
+          <div style="font-size:11.5px;color:var(--text3);font-family:'DM Sans',sans-serif">Live exchange rates · Search any currency</div>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:end;margin-bottom:16px">
+          <div>
+            <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px">Amount</label>
+            <input type="number" id="cc-amount" value="100" min="0" step="any" style="width:100%;font-size:16px;font-weight:600" oninput="convertCurrency()"/>
+          </div>
+          <div style="padding-bottom:2px">
+            <button onclick="swapCurrencies()" style="width:38px;height:38px;border-radius:50%;background:var(--surface2);border:1.5px solid var(--border);color:var(--gold-l);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s" title="Swap currencies">⇄</button>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px">Result</label>
+            <div id="cc-result" style="font-size:16px;font-weight:600;color:var(--gold-l);padding:10px 13px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;min-height:42px;font-family:'DM Sans',sans-serif">—</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px">From Currency</label>
+            <div style="position:relative">
+              <input id="cc-from-search" placeholder="Search currency (e.g. USD, Euro, Yen)…" style="width:100%;padding-right:32px" oninput="filterCurrencies('from',this.value)" onfocus="showCurrencyDropdown('from')" autocomplete="off"/>
+              <div id="cc-from-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2);margin-top:2px"></div>
+            </div>
+            <div id="cc-from-selected" style="font-size:12px;color:var(--gold-l);margin-top:5px;font-family:'DM Sans',sans-serif;font-weight:500"></div>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:6px;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px">To Currency</label>
+            <div style="position:relative">
+              <input id="cc-to-search" placeholder="Search currency (e.g. EUR, Pound, Rupee)…" style="width:100%;padding-right:32px" oninput="filterCurrencies('to',this.value)" onfocus="showCurrencyDropdown('to')" autocomplete="off"/>
+              <div id="cc-to-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.2);margin-top:2px"></div>
+            </div>
+            <div id="cc-to-selected" style="font-size:12px;color:var(--gold-l);margin-top:5px;font-family:'DM Sans',sans-serif;font-weight:500"></div>
+          </div>
+        </div>
+        <div id="cc-rate-info" style="font-size:12px;color:var(--text3);font-family:'DM Sans',sans-serif;padding:10px 14px;background:var(--surface2);border-radius:8px;display:none"></div>
+        <div style="margin-top:12px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:8px;font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px">Quick select</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${[['USD','🇺🇸'],['EUR','🇪🇺'],['GBP','🇬🇧'],['JPY','🇯🇵'],['AUD','🇦🇺'],['CAD','🇨🇦'],['CHF','🇨🇭'],['CNY','🇨🇳'],['INR','🇮🇳'],['AED','🇦🇪'],['SGD','🇸🇬'],['THB','🇹🇭'],['MXN','🇲🇽'],['BRL','🇧🇷'],['ZAR','🇿🇦'],['TRY','🇹🇷'],['KRW','🇰🇷'],['IDR','🇮🇩'],['MYR','🇲🇾'],['PHP','🇵🇭']].map(([code,flag])=>`
+            <button onclick="quickSelectCurrency('${code}')" style="padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .14s;display:flex;align-items:center;gap:4px" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">${flag} ${code}</button>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>`;
 }
+/* ════════ CURRENCY CONVERTER ════════ */
+const CURRENCIES = [
+  {code:'USD',name:'US Dollar',symbol:'$',flag:'🇺🇸'},
+  {code:'EUR',name:'Euro',symbol:'€',flag:'🇪🇺'},
+  {code:'GBP',name:'British Pound',symbol:'£',flag:'🇬🇧'},
+  {code:'JPY',name:'Japanese Yen',symbol:'¥',flag:'🇯🇵'},
+  {code:'AUD',name:'Australian Dollar',symbol:'A$',flag:'🇦🇺'},
+  {code:'CAD',name:'Canadian Dollar',symbol:'C$',flag:'🇨🇦'},
+  {code:'CHF',name:'Swiss Franc',symbol:'Fr',flag:'🇨🇭'},
+  {code:'CNY',name:'Chinese Yuan',symbol:'¥',flag:'🇨🇳'},
+  {code:'INR',name:'Indian Rupee',symbol:'₹',flag:'🇮🇳'},
+  {code:'AED',name:'UAE Dirham',symbol:'د.إ',flag:'🇦🇪'},
+  {code:'SGD',name:'Singapore Dollar',symbol:'S$',flag:'🇸🇬'},
+  {code:'THB',name:'Thai Baht',symbol:'฿',flag:'🇹🇭'},
+  {code:'MXN',name:'Mexican Peso',symbol:'$',flag:'🇲🇽'},
+  {code:'BRL',name:'Brazilian Real',symbol:'R$',flag:'🇧🇷'},
+  {code:'ZAR',name:'South African Rand',symbol:'R',flag:'🇿🇦'},
+  {code:'TRY',name:'Turkish Lira',symbol:'₺',flag:'🇹🇷'},
+  {code:'KRW',name:'South Korean Won',symbol:'₩',flag:'🇰🇷'},
+  {code:'IDR',name:'Indonesian Rupiah',symbol:'Rp',flag:'🇮🇩'},
+  {code:'MYR',name:'Malaysian Ringgit',symbol:'RM',flag:'🇲🇾'},
+  {code:'PHP',name:'Philippine Peso',symbol:'₱',flag:'🇵🇭'},
+  {code:'HKD',name:'Hong Kong Dollar',symbol:'HK$',flag:'🇭🇰'},
+  {code:'TWD',name:'Taiwan Dollar',symbol:'NT$',flag:'🇹🇼'},
+  {code:'SEK',name:'Swedish Krona',symbol:'kr',flag:'🇸🇪'},
+  {code:'NOK',name:'Norwegian Krone',symbol:'kr',flag:'🇳🇴'},
+  {code:'DKK',name:'Danish Krone',symbol:'kr',flag:'🇩🇰'},
+  {code:'PLN',name:'Polish Zloty',symbol:'zł',flag:'🇵🇱'},
+  {code:'CZK',name:'Czech Koruna',symbol:'Kč',flag:'🇨🇿'},
+  {code:'HUF',name:'Hungarian Forint',symbol:'Ft',flag:'🇭🇺'},
+  {code:'RON',name:'Romanian Leu',symbol:'lei',flag:'🇷🇴'},
+  {code:'BGN',name:'Bulgarian Lev',symbol:'лв',flag:'🇧🇬'},
+  {code:'HRK',name:'Croatian Kuna',symbol:'kn',flag:'🇭🇷'},
+  {code:'RUB',name:'Russian Ruble',symbol:'₽',flag:'🇷🇺'},
+  {code:'UAH',name:'Ukrainian Hryvnia',symbol:'₴',flag:'🇺🇦'},
+  {code:'SAR',name:'Saudi Riyal',symbol:'﷼',flag:'🇸🇦'},
+  {code:'QAR',name:'Qatari Riyal',symbol:'﷼',flag:'🇶🇦'},
+  {code:'KWD',name:'Kuwaiti Dinar',symbol:'د.ك',flag:'🇰🇼'},
+  {code:'BHD',name:'Bahraini Dinar',symbol:'.د.ب',flag:'🇧🇭'},
+  {code:'OMR',name:'Omani Rial',symbol:'﷼',flag:'🇴🇲'},
+  {code:'JOD',name:'Jordanian Dinar',symbol:'JD',flag:'🇯🇴'},
+  {code:'ILS',name:'Israeli Shekel',symbol:'₪',flag:'🇮🇱'},
+  {code:'EGP',name:'Egyptian Pound',symbol:'£',flag:'🇪🇬'},
+  {code:'MAD',name:'Moroccan Dirham',symbol:'MAD',flag:'🇲🇦'},
+  {code:'TND',name:'Tunisian Dinar',symbol:'DT',flag:'🇹🇳'},
+  {code:'NGN',name:'Nigerian Naira',symbol:'₦',flag:'🇳🇬'},
+  {code:'KES',name:'Kenyan Shilling',symbol:'KSh',flag:'🇰🇪'},
+  {code:'GHS',name:'Ghanaian Cedi',symbol:'₵',flag:'🇬🇭'},
+  {code:'ETB',name:'Ethiopian Birr',symbol:'Br',flag:'🇪🇹'},
+  {code:'TZS',name:'Tanzanian Shilling',symbol:'TSh',flag:'🇹🇿'},
+  {code:'UGX',name:'Ugandan Shilling',symbol:'USh',flag:'🇺🇬'},
+  {code:'ZMW',name:'Zambian Kwacha',symbol:'ZK',flag:'🇿🇲'},
+  {code:'BWP',name:'Botswana Pula',symbol:'P',flag:'🇧🇼'},
+  {code:'MUR',name:'Mauritian Rupee',symbol:'₨',flag:'🇲🇺'},
+  {code:'PKR',name:'Pakistani Rupee',symbol:'₨',flag:'🇵🇰'},
+  {code:'BDT',name:'Bangladeshi Taka',symbol:'৳',flag:'🇧🇩'},
+  {code:'LKR',name:'Sri Lankan Rupee',symbol:'₨',flag:'🇱🇰'},
+  {code:'NPR',name:'Nepalese Rupee',symbol:'₨',flag:'🇳🇵'},
+  {code:'MMK',name:'Myanmar Kyat',symbol:'K',flag:'🇲🇲'},
+  {code:'VND',name:'Vietnamese Dong',symbol:'₫',flag:'🇻🇳'},
+  {code:'KHR',name:'Cambodian Riel',symbol:'៛',flag:'🇰🇭'},
+  {code:'LAK',name:'Lao Kip',symbol:'₭',flag:'🇱🇦'},
+  {code:'MNT',name:'Mongolian Tugrik',symbol:'₮',flag:'🇲🇳'},
+  {code:'KZT',name:'Kazakhstani Tenge',symbol:'₸',flag:'🇰🇿'},
+  {code:'UZS',name:'Uzbekistani Som',symbol:'лв',flag:'🇺🇿'},
+  {code:'GEL',name:'Georgian Lari',symbol:'₾',flag:'🇬🇪'},
+  {code:'AMD',name:'Armenian Dram',symbol:'֏',flag:'🇦🇲'},
+  {code:'AZN',name:'Azerbaijani Manat',symbol:'₼',flag:'🇦🇿'},
+  {code:'CLP',name:'Chilean Peso',symbol:'$',flag:'🇨🇱'},
+  {code:'COP',name:'Colombian Peso',symbol:'$',flag:'🇨🇴'},
+  {code:'PEN',name:'Peruvian Sol',symbol:'S/',flag:'🇵🇪'},
+  {code:'ARS',name:'Argentine Peso',symbol:'$',flag:'🇦🇷'},
+  {code:'BOB',name:'Bolivian Boliviano',symbol:'Bs.',flag:'🇧🇴'},
+  {code:'PYG',name:'Paraguayan Guarani',symbol:'₲',flag:'🇵🇾'},
+  {code:'UYU',name:'Uruguayan Peso',symbol:'$U',flag:'🇺🇾'},
+  {code:'CRC',name:'Costa Rican Colon',symbol:'₡',flag:'🇨🇷'},
+  {code:'GTQ',name:'Guatemalan Quetzal',symbol:'Q',flag:'🇬🇹'},
+  {code:'HNL',name:'Honduran Lempira',symbol:'L',flag:'🇭🇳'},
+  {code:'NIO',name:'Nicaraguan Cordoba',symbol:'C$',flag:'🇳🇮'},
+  {code:'DOP',name:'Dominican Peso',symbol:'RD$',flag:'🇩🇴'},
+  {code:'JMD',name:'Jamaican Dollar',symbol:'J$',flag:'🇯🇲'},
+  {code:'TTD',name:'Trinidad Dollar',symbol:'TT$',flag:'🇹🇹'},
+  {code:'BBD',name:'Barbadian Dollar',symbol:'Bds$',flag:'🇧🇧'},
+  {code:'NZD',name:'New Zealand Dollar',symbol:'NZ$',flag:'🇳🇿'},
+  {code:'FJD',name:'Fijian Dollar',symbol:'FJ$',flag:'🇫🇯'},
+  {code:'PGK',name:'Papua New Guinea Kina',symbol:'K',flag:'🇵🇬'},
+  {code:'XOF',name:'West African CFA Franc',symbol:'CFA',flag:'🌍'},
+  {code:'XAF',name:'Central African CFA Franc',symbol:'FCFA',flag:'🌍'},
+  {code:'XPF',name:'CFP Franc',symbol:'Fr',flag:'🌏'},
+  {code:'ISK',name:'Icelandic Krona',symbol:'kr',flag:'🇮🇸'},
+  {code:'MKD',name:'Macedonian Denar',symbol:'ден',flag:'🇲🇰'},
+  {code:'RSD',name:'Serbian Dinar',symbol:'din',flag:'🇷🇸'},
+  {code:'BAM',name:'Bosnia Mark',symbol:'KM',flag:'🇧🇦'},
+  {code:'ALL',name:'Albanian Lek',symbol:'L',flag:'🇦🇱'},
+  {code:'MDL',name:'Moldovan Leu',symbol:'L',flag:'🇲🇩'},
+  {code:'BYN',name:'Belarusian Ruble',symbol:'Br',flag:'🇧🇾'},
+  {code:'LBP',name:'Lebanese Pound',symbol:'£',flag:'🇱🇧'},
+  {code:'IQD',name:'Iraqi Dinar',symbol:'ع.د',flag:'🇮🇶'},
+  {code:'IRR',name:'Iranian Rial',symbol:'﷼',flag:'🇮🇷'},
+  {code:'AFN',name:'Afghan Afghani',symbol:'؋',flag:'🇦🇫'},
+];
+
+let CC = { from: 'USD', to: 'EUR', rates: null, lastFetch: 0 };
+
+async function fetchRates(base){
+  const now = Date.now();
+  // Cache for 10 minutes
+  if(CC.rates && CC.ratesBase===base && now-CC.lastFetch < 600000) return CC.rates;
+  try{
+    const resp = await fetch(`https://api.frankfurter.app/latest?from=${base}`);
+    const data = await resp.json();
+    CC.rates = data.rates;
+    CC.ratesBase = base;
+    CC.lastFetch = now;
+    return CC.rates;
+  }catch(e){
+    return null;
+  }
+}
+
+async function convertCurrency(){
+  const amount = parseFloat(document.getElementById('cc-amount')?.value)||0;
+  const resultEl = document.getElementById('cc-result');
+  const rateEl = document.getElementById('cc-rate-info');
+  if(!CC.from||!CC.to){ if(resultEl) resultEl.textContent='Select currencies'; return; }
+  if(CC.from===CC.to){ if(resultEl) resultEl.textContent=amount.toLocaleString(); return; }
+  if(resultEl) resultEl.textContent='Loading…';
+  const rates = await fetchRates(CC.from);
+  if(!rates){ if(resultEl) resultEl.textContent='Rate unavailable'; return; }
+  const rate = rates[CC.to];
+  if(!rate){ if(resultEl) resultEl.textContent='Rate not found'; return; }
+  const converted = (amount * rate);
+  const fromCur = CURRENCIES.find(c=>c.code===CC.from);
+  const toCur = CURRENCIES.find(c=>c.code===CC.to);
+  const fmt = (n,code)=>{ try{ return new Intl.NumberFormat('en-US',{style:'currency',currency:code,maximumFractionDigits:code==='JPY'||code==='KRW'||code==='IDR'?0:2}).format(n); }catch(e){ return n.toFixed(2)+' '+code; } };
+  if(resultEl) resultEl.textContent = fmt(converted, CC.to);
+  if(rateEl){
+    rateEl.style.display='block';
+    rateEl.innerHTML=`1 ${fromCur?.flag||''} ${CC.from} = ${rate.toFixed(4)} ${toCur?.flag||''} ${CC.to} &nbsp;·&nbsp; ${fmt(amount,CC.from)} = ${fmt(converted,CC.to)} &nbsp;·&nbsp; <span style="color:var(--text3)">Rates via Frankfurter API</span>`;
+  }
+}
+
+function filterCurrencies(side, query){
+  const q = query.toLowerCase();
+  const filtered = CURRENCIES.filter(c=>
+    c.code.toLowerCase().includes(q) ||
+    c.name.toLowerCase().includes(q) ||
+    c.symbol.toLowerCase().includes(q)
+  ).slice(0,20);
+  const dd = document.getElementById(`cc-${side}-dropdown`);
+  if(!dd) return;
+  dd.style.display = filtered.length ? 'block' : 'none';
+  dd.innerHTML = filtered.map(c=>`
+    <div onclick="selectCurrency('${side}','${c.code}')" style="padding:9px 13px;cursor:pointer;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;font-size:13px;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <span style="font-size:16px">${c.flag}</span>
+      <span style="font-weight:600;color:var(--text)">${c.code}</span>
+      <span style="color:var(--text3);font-size:12px">${c.name}</span>
+      <span style="margin-left:auto;color:var(--gold-l);font-size:12px">${c.symbol}</span>
+    </div>`).join('');
+}
+
+function showCurrencyDropdown(side){
+  filterCurrencies(side, document.getElementById(`cc-${side}-search`)?.value||'');
+}
+
+function selectCurrency(side, code){
+  CC[side] = code;
+  const cur = CURRENCIES.find(c=>c.code===code);
+  const inp = document.getElementById(`cc-${side}-search`);
+  const sel = document.getElementById(`cc-${side}-selected`);
+  const dd = document.getElementById(`cc-${side}-dropdown`);
+  if(inp) inp.value = `${cur.flag} ${cur.code} — ${cur.name}`;
+  if(sel) sel.textContent = `${cur.symbol} ${cur.name}`;
+  if(dd) dd.style.display = 'none';
+  CC.rates = null; // Force refresh for new base
+  convertCurrency();
+}
+
+function quickSelectCurrency(code){
+  // If from is not set, set from. Otherwise set to.
+  if(!CC.from || CC.from===CC.to){
+    selectCurrency('from', code);
+  } else {
+    selectCurrency('to', code);
+  }
+}
+
+function swapCurrencies(){
+  const tmp = CC.from;
+  CC.from = CC.to;
+  CC.to = tmp;
+  const fromCur = CURRENCIES.find(c=>c.code===CC.from);
+  const toCur = CURRENCIES.find(c=>c.code===CC.to);
+  const fromInp = document.getElementById('cc-from-search');
+  const toInp = document.getElementById('cc-to-search');
+  const fromSel = document.getElementById('cc-from-selected');
+  const toSel = document.getElementById('cc-to-selected');
+  if(fromInp && fromCur) fromInp.value = `${fromCur.flag} ${fromCur.code} — ${fromCur.name}`;
+  if(toInp && toCur) toInp.value = `${toCur.flag} ${toCur.code} — ${toCur.name}`;
+  if(fromSel && fromCur) fromSel.textContent = `${fromCur.symbol} ${fromCur.name}`;
+  if(toSel && toCur) toSel.textContent = `${toCur.symbol} ${toCur.name}`;
+  CC.rates = null;
+  convertCurrency();
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#cc-from-search') && !e.target.closest('#cc-from-dropdown')){
+    const dd = document.getElementById('cc-from-dropdown');
+    if(dd) dd.style.display='none';
+  }
+  if(!e.target.closest('#cc-to-search') && !e.target.closest('#cc-to-dropdown')){
+    const dd = document.getElementById('cc-to-dropdown');
+    if(dd) dd.style.display='none';
+  }
+});
+
 function budgetBreakdown(){
   const {days,budget} = S.budget;
   const pd = days > 0 ? Math.round(budget/days) : 0;
@@ -2210,7 +2486,7 @@ const QUICK_PROMPTS=['Plan 7 days in Japan','Best beaches in SE Asia','Safaris i
 
 function getSystemPrompt(){
   const profile = S.userData?.profile;
-  let sys = `You are Voyager, an expert AI travel agent. Be specific, warm, and practical — like a well-travelled friend.\n\nUser: ${S.user?.name||'Explorer'}`;
+  let sys = `You are Kelly, an expert AI travel agent for Pathwise. Be specific, warm, and practical — like a well-travelled friend.\n\nUser: ${S.user?.name||'Explorer'}`;
   if(profile){
     if(profile.age) sys += `, age ${profile.age}`;
     if(profile.country) sys += `, from ${profile.country}`;
@@ -2234,7 +2510,7 @@ function getTravelFallback(msg){
   if(/honeymoon|romantic|couple|anniversary/.test(m)) return {text:`Most romantic destinations:\n\n💑 Classic: Santorini, Maldives, Tuscany, Paris\n🌅 Adventurous: Bali, Machu Picchu, New Zealand, Iceland\n🏖️ Beach: Seychelles, Sri Lanka, Mauritius, Fiji\n\nFor a honeymoon, I'd recommend:\n• 3-4 nights: somewhere luxurious and relaxing\n• 3-4 nights: culture and exploration\n• End on a beach paradise\n\nWhat's your approximate budget and how many days do you have?`};
   if(/safari|africa|wildlife|animals/.test(m)) return {text:`Best African safaris by budget:\n\n🔥 Premium: Botswana (Okavango Delta), Tanzania (Serengeti Migration)\n✅ Mid-range: Kenya (Maasai Mara), South Africa (Kruger)\n💚 Budget: Uganda (gorillas), Zimbabwe (Hwange)\n\nBest time: July-October for the Great Migration\nGorilla trekking: year-round in Rwanda & Uganda\n\nA 10-day East Africa safari (Kenya + Tanzania) runs $3,000-8,000/person all-in depending on camp quality.\n\nWhich country would you like to explore?`};
   if(/family|kids|children/.test(m)) return {text:`Best family destinations:\n\n🎡 Young children: Japan (safe & fun), Portugal (beaches + castles), Singapore (clean & engaging), New Zealand\n🌍 Older kids: Safari in Kenya/South Africa, Peru (Machu Picchu), Iceland, Costa Rica\n\nFamily travel tips:\n• Build in slow mornings — kids need breakfast time\n• Choose accommodation with kitchenettes\n• Book flexible tickets — kids get sick\n• Always get comprehensive travel insurance\n\nHow old are your children? I'll give specific recommendations.`};
-  return {text:`I can help you plan trips to any of the 200+ destinations in Voyager! Ask me about:\n\n🗺️ Full day-by-day itineraries\n💰 Budget breakdowns\n🛂 Visa requirements\n🌤️ Best times to visit\n🔒 Safety and travel tips\n💑 Honeymoon & romantic escapes\n👨‍👩‍👧 Family-friendly destinations\n\nWhere in the world would you like to go?`};
+  return {text:`I can help you plan trips to any of the 200+ destinations in Pathwise! Ask me about:\n\n🗺️ Full day-by-day itineraries\n💰 Budget breakdowns\n🛂 Visa requirements\n🌤️ Best times to visit\n🔒 Safety and travel tips\n💑 Honeymoon & romantic escapes\n👨‍👩‍👧 Family-friendly destinations\n\nWhere in the world would you like to go?`};
 }
 
 function buildChatPage(){
@@ -2242,10 +2518,10 @@ function buildChatPage(){
   container.className = 'chat-wrap';
   const profile = S.userData?.profile;
   const bucketMention = profile?.bucketList?.length ? ` Your bucket list includes ${profile.bucketList.slice(0,3).join(', ')}${profile.bucketList.length>3?` and ${profile.bucketList.length-3} more`:''}. Let me help you tick them off!` : '';
-  const initMsg = S.chat.length === 0 ? `Hi ${firstName()}! I'm your personal AI travel agent.${bucketMention}\n\nI know you're ${profile?.age||'a'} year${profile?.age?'':'s'}-old ${profile?.travelersType||'traveller'} from ${profile?.country||'the world'} — so all my recommendations will be tailored to you.\n\nAsk me to plan a trip, find hidden gems, compare destinations, or anything travel-related!` : null;
+  const initMsg = S.chat.length === 0 ? `Hi ${firstName()}! I'm Kelly, your personal AI travel agent at Pathwise.${bucketMention}\n\nI know you're ${profile?.age||'a'} year${profile?.age?'':'s'}-old ${profile?.travelersType||'traveller'} from ${profile?.country||'the world'} — so all my recommendations will be tailored to you.\n\nAsk me to plan a trip, find hidden gems, compare destinations, or anything travel-related!` : null;
   const init = (S.user?.name||'U').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
   container.innerHTML = `
-  <div class="chat-head"><h2>✦ AI Travel Agent</h2><p>Personalised travel planning powered by AI — tailored to your profile and preferences</p></div>
+  <div class="chat-head"><h2>✦ Kelly</h2><p>Your personal AI travel agent — tailored to your profile and preferences</p></div>
   <div class="quick-chips">${QUICK_PROMPTS.map(p=>`<button class="qchip" data-qp="${p}">${p}</button>`).join('')}</div>
   <div class="chat-messages" id="chat-msgs">
     ${initMsg ? `<div class="msg"><div class="msg-av ai-av">✈</div><div class="msg-bubble ai-bubble">${initMsg}</div></div>` : ''}

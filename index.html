@@ -405,8 +405,10 @@ textarea{resize:vertical}
     </div>
     <nav class="sidebar-nav" id="sidebar-nav">
       <div class="nav-section-label">Explore</div>
-      <button class="nav-btn active" data-page="home"><span class="ni">🌍</span><span>Destinations</span></button>
+      <button class="nav-btn active" data-page="home"><span class="ni">🧭</span><span>Find My Match</span></button>
+      <button class="nav-btn" onclick="skipToDestinations()" id="nav-browse"><span class="ni">🌍</span><span>All Destinations</span></button>
       <button class="nav-btn" data-page="chat"><span class="ni">✦</span><span>Ask Kelly</span></button>
+      <button class="nav-btn" data-page="quiz"><span class="ni">📋</span><span>Quiz</span></button>
       <div class="nav-section-label">Plan</div>
       <button class="nav-btn" data-page="budget"><span class="ni">💰</span><span>Budget Planner</span></button>
       <button class="nav-btn" data-page="packing"><span class="ni">🧳</span><span>Packing Lists</span></button>
@@ -1296,7 +1298,7 @@ function firstName(){ return (S.user?.name||'').split(' ')[0] || 'Explorer'; }
 /* ════════ RENDER ENGINE ════════ */
 function render(){
   const el = document.getElementById('page-content');
-  document.getElementById('top-bar-title').textContent = S.selectedCountry ? S.selectedCountry.name : {home:'Explore the World',chat:'Kelly — AI Travel Agent',budget:'Budget Planner',packing:'Packing Lists'}[S.page]||'Pathwise';
+  document.getElementById('top-bar-title').textContent = S.selectedCountry ? S.selectedCountry.name : {home:'Explore the World',chat:'Kelly — AI Travel Agent',budget:'Budget Planner',packing:'Packing Lists',quiz:'Find My Destination'}[S.page]||'Pathwise';
   const w = document.createElement('div');
   w.className = 'fade-in'; w.style.height = '100%';
   if(S.selectedCountry) w.innerHTML = renderTripPlan();
@@ -1310,6 +1312,7 @@ function render(){
     return;
   }
   else if(S.page==='packing') w.innerHTML = renderPacking();
+  else if(S.page==='quiz'){ w.innerHTML = renderQuiz(); el.innerHTML=''; el.appendChild(w); bindEvents(); updateNav(); bindQuizEvents(); return; }
   else if(S.page==='chat'){ w.appendChild(buildChatPage()); el.innerHTML=''; el.appendChild(w); bindEvents(); updateNav(); return; }
   el.innerHTML=''; el.appendChild(w);
   bindEvents(); updateNav();
@@ -1318,41 +1321,165 @@ function setPage(p){ S.page=p; S.selectedCountry=null; render(); }
 
 /* ════════ HOME ════════ */
 function renderHome(){
+  // If quiz is done, show results + option to browse all
+  if(quizDone && Object.keys(quizAnswers).length > 0){
+    return renderHomeWithResults();
+  }
+  // Otherwise show quiz as the home screen
+  const profile = S.userData?.profile;
+  return `
+  ${profile ? `<div class="profile-banner">
+    <div class="pb-flag">✈️</div>
+    <div class="pb-info">
+      <div class="pb-greeting">Welcome back, ${firstName()}!</div>
+      <div class="pb-detail">Age ${profile.age} · From ${profile.country||'the world'} · ${profile.travelersType||'Explorer'}</div>
+    </div>
+    <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Ask Kelly</button>
+  </div>` : ''}
+  ${S.savedItineraryCountry && IB.generatedPlan ? `
+  <div style="background:linear-gradient(135deg,var(--gold-dim),var(--gold-dim2));border:1px solid rgba(201,169,110,.3);border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+    <div style="font-size:32px">${S.savedItineraryCountry.flag}</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:14px;font-weight:600;color:var(--gold-l)">Pick up where you left off</div>
+      <div style="font-size:12.5px;color:var(--text2);margin-top:3px">You were planning a ${IB.days}-day trip to <strong style="color:var(--text)">${S.savedItineraryCountry.name}</strong></div>
+    </div>
+    <button class="btn btn-gold btn-sm" onclick="S.selectedCountry=S.savedItineraryCountry;IB.step=5;render()">Resume Planning →</button>
+  </div>` : ''}
+  <div style="max-width:720px;margin:0 auto;padding:28px 20px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:13px;font-weight:600;color:var(--gold-l);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">✦ Personalised Discovery</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:600;color:var(--text);margin-bottom:10px">Find Your Perfect Destination</div>
+      <div style="font-size:14px;color:var(--text3);line-height:1.7;max-width:480px;margin:0 auto">Answer 7 quick questions and we'll match you with the destinations that fit your travel style, budget, and interests.</div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button onclick="startHomeQuiz()" style="padding:12px 32px;border-radius:10px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#0A0C0F;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px">Start the Quiz ✨</button>
+        <button onclick="skipToDestinations()" style="padding:12px 24px;border-radius:10px;border:1.5px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Browse All Destinations →</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:28px">
+      ${[
+        {icon:'🌴',label:'Tropical Beaches'},
+        {icon:'🏔️',label:'Mountain Adventures'},
+        {icon:'🏛️',label:'Culture & History'},
+        {icon:'❄️',label:'Northern Lights'},
+        {icon:'🦁',label:'Wildlife Safaris'},
+        {icon:'🍜',label:'Food & Cuisine'},
+        {icon:'🏙️',label:'City Breaks'},
+        {icon:'🤿',label:'Diving & Reefs'},
+      ].map(c=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .15s" onclick="startHomeQuiz()" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="font-size:28px;margin-bottom:6px">${c.icon}</div>
+          <div style="font-size:11px;color:var(--text2);font-weight:500">${c.label}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div id="home-quiz-area"></div>
+  </div>`;
+}
+
+function startHomeQuiz(){
+  quizAnswers={};
+  quizStep=0;
+  quizDone=false;
+  const area=document.getElementById('home-quiz-area');
+  if(area){
+    area.innerHTML=`<div id="quiz-body">${renderQuizStep()}</div>`;
+    area.scrollIntoView({behavior:'smooth',block:'start'});
+    bindQuizEvents();
+  } else {
+    // Fallback: go to quiz page
+    setPage('quiz');
+  }
+}
+
+function skipToDestinations(){
+  // Show all destinations inline
+  const el=document.getElementById('page-content');
+  const w=document.createElement('div');
+  w.className='fade-in';
+  w.style.height='100%';
+  w.innerHTML=renderAllDestinations();
+  el.innerHTML='';
+  el.appendChild(w);
+  bindEvents();
+  updateNav();
+}
+
+function renderHomeWithResults(){
+  const scored = ALL_DESTINATIONS.map(d=>({...d, score:scoreDestination(d)}))
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,9);
+  const top=scored[0];
+  const rest=scored.slice(1);
+  return `
+  <div style="max-width:900px;margin:0 auto;padding:28px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+      <div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;color:var(--text)">Your Matched Destinations</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">Based on your quiz answers</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="startHomeQuiz()" style="padding:9px 18px;border-radius:8px;border:1.5px solid var(--gold);background:transparent;color:var(--gold-l);font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px">↺ Retake Quiz</button>
+        <button onclick="skipToDestinations()" style="padding:9px 18px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:12px">Browse All →</button>
+      </div>
+    </div>
+    <!-- TOP MATCH -->
+    <div style="background:linear-gradient(135deg,var(--gold-dim),var(--surface2));border:1.5px solid var(--gold);border-radius:16px;padding:24px;margin-bottom:20px;cursor:pointer" onclick="selectCountry('${top.id}')">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="font-size:40px">${top.flag}</div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--gold-l);letter-spacing:1px;text-transform:uppercase">🏆 Best Match</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--text)">${top.name}</div>
+          <div style="font-size:12px;color:var(--text3)">${top.region}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:22px;font-weight:700;color:var(--gold-l)">${top.score}pts</div>
+          <div style="font-size:10px;color:var(--text3)">match score</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">${top.desc}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        ${(top.tags||[]).map(t=>`<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--gold-dim);color:var(--gold-l);border:1px solid var(--gold)">${t}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text3);flex-wrap:wrap">
+        <span>📅 ${top.duration}</span><span>💰 ${top.budget}</span><span>🌤️ Best: ${top.best}</span>
+      </div>
+      <div style="margin-top:12px;text-align:right;font-size:12px;color:var(--gold-l);font-weight:600">View full trip plan →</div>
+    </div>
+    <!-- OTHER MATCHES -->
+    <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">More great options for you</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+      ${rest.map(d=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s" onclick="selectCountry('${d.id}')" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:26px">${d.flag}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${d.name}</div>
+              <div style="font-size:10px;color:var(--text3)">${d.region}</div>
+            </div>
+            <div style="margin-left:auto;font-size:12px;font-weight:600;color:var(--gold-l)">${d.score}pts</div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:8px">${d.desc.slice(0,80)}...</div>
+          <div style="font-size:10px;color:var(--text3)">💰 ${d.budget}</div>
+        </div>
+      `).join('')}
+    </div>
+  </div>`;
+}
+
+function renderAllDestinations(){
   const q = S.searchQuery.toLowerCase();
   const filtered = ALL_DESTINATIONS.filter(c=>{
     const rm = S.activeRegion==='All' || c.region===S.activeRegion;
     const sm = !q || c.name.toLowerCase().includes(q) || c.region.toLowerCase().includes(q) || c.tags.some(t=>t.toLowerCase().includes(q)) || c.desc.toLowerCase().includes(q);
     return rm && sm;
   });
-  const profile = S.userData?.profile;
-  const recentSearches = S.userData?.recentSearches || [];
   return `
-  ${profile ? `<div class="profile-banner">
-    <div class="pb-flag">✈️</div>
-    <div class="pb-info">
-      <div class="pb-greeting">Welcome back, ${firstName()}!</div>
-      <div class="pb-detail">Age ${profile.age} · From ${profile.country||'the world'} · ${profile.travelersType||'Explorer'} · ${profile.bucketList?.length||0} bucket list dreams</div>
-    </div>
-    <button class="btn btn-gold btn-sm" onclick="setPage('chat')">✦ Get AI recommendations</button>
-  </div>` : ''}
-  ${S.savedItineraryCountry && IB.generatedPlan ? `
-  <div style="background:linear-gradient(135deg,var(--gold-dim),var(--gold-dim2));border:1px solid rgba(201,169,110,.3);border-radius:14px;padding:18px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-    <div style="font-size:32px">${S.savedItineraryCountry.flag}</div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:14px;font-weight:600;color:var(--gold-l);font-family:'DM Sans',sans-serif">Pick up where you left off</div>
-      <div style="font-size:12.5px;color:var(--text2);margin-top:3px;font-family:'DM Sans',sans-serif">You were planning a ${IB.days}-day trip to <strong style="color:var(--text)">${S.savedItineraryCountry.name}</strong>${IB.startDate?' starting '+IB.startDate:''}</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-gold btn-sm" onclick="S.selectedCountry=S.savedItineraryCountry;IB.step=5;render()">Resume Planning →</button>
-      <button class="btn btn-ghost btn-sm" onclick="IB.generatedPlan=null;S.savedItineraryCountry=null;S.userData.savedItinerary=null;saveData();render()">Start Fresh</button>
-    </div>
-  </div>` : ''}
   <div class="hero">
     <div class="hero-bg"></div><div class="hero-grid"></div>
     <div class="hero-content">
       <div class="hero-badge">✦ AI-Powered Travel Planning</div>
       <h1>Discover your next <em>adventure</em></h1>
-      <p>Personalised trip plans for every country on Earth, powered by AI. From 3-day getaways to month-long expeditions.</p>
+      <p>Personalised trip plans for every country on Earth, powered by AI.</p>
       <div class="hero-search">
         <input id="hero-search" placeholder="Search countries, experiences, regions…" value="${S.searchQuery}" oninput="S.searchQuery=this.value;renderGrid()"/>
         <button class="btn-search" onclick="setPage('chat')">✦ Ask Kelly</button>
@@ -1366,6 +1493,7 @@ function renderHome(){
     <div style="font-size:12.5px;color:var(--text3);margin-bottom:14px">${filtered.length} destination${filtered.length!==1?'s':''} found</div>
     <div class="country-grid" id="country-grid">${renderCards(filtered)}</div>
   </div>`;
+}
 }
 
 function renderCards(list){
@@ -2161,6 +2289,341 @@ function renderIBError(msg){
 }
 
 
+
+/* ════════ DESTINATION QUIZ ════════ */
+const QUIZ_STEPS = [
+  {
+    id:'climate', q:'What climate do you prefer?', multi:false,
+    opts:[
+      {v:'tropical',l:'🌴 Tropical',d:'Hot, humid, beaches & rainforests'},
+      {v:'temperate',l:'🌤️ Temperate',d:'Mild seasons, comfortable year-round'},
+      {v:'cold',l:'❄️ Cold & Snowy',d:'Winter sports, Northern Lights, cosy vibes'},
+      {v:'dry',l:'☀️ Hot & Dry',d:'Desert, sun, minimal rain'},
+      {v:'any',l:'🌍 No preference',d:'Open to anything'},
+    ]
+  },
+  {
+    id:'vibe', q:'What kind of trip are you looking for?', multi:true,
+    opts:[
+      {v:'adventure',l:'🧗 Adventure',d:'Hiking, trekking, extreme sports'},
+      {v:'culture',l:'🏛️ Culture & History',d:'Museums, ruins, local traditions'},
+      {v:'food',l:'🍜 Food & Cuisine',d:'Street food, fine dining, cooking classes'},
+      {v:'nature',l:'🌿 Nature & Wildlife',d:'National parks, safaris, landscapes'},
+      {v:'beach',l:'🏖️ Beach & Relaxation',d:'Sun, sea, sand, resorts'},
+      {v:'city',l:'🏙️ City Life',d:'Nightlife, shopping, urban energy'},
+      {v:'luxury',l:'💎 Luxury',d:'5-star hotels, spas, exclusive experiences'},
+      {v:'budget',l:'💸 Budget Travel',d:'Backpacking, hostels, value for money'},
+    ]
+  },
+  {
+    id:'duration', q:'How long is your trip?', multi:false,
+    opts:[
+      {v:'short',l:'⚡ Weekend / 3-5 days',d:'Quick getaway'},
+      {v:'week',l:'📅 1-2 weeks',d:'Standard holiday'},
+      {v:'long',l:'🗺️ 3-4 weeks',d:'Extended exploration'},
+      {v:'extended',l:'✈️ 1+ month',d:'Long-term travel or sabbatical'},
+    ]
+  },
+  {
+    id:'budget_tier', q:'What is your daily budget per person?', multi:false,
+    opts:[
+      {v:'low',l:'💚 Under $80/day',d:'Budget — hostels, street food, local transport'},
+      {v:'mid',l:'💛 $80–200/day',d:'Mid-range — 3-star hotels, restaurants'},
+      {v:'high',l:'🧡 $200–500/day',d:'Comfort — 4-star, guided tours'},
+      {v:'luxury',l:'💎 $500+/day',d:'Luxury — 5-star, private experiences'},
+    ]
+  },
+  {
+    id:'travel_style', q:'How do you like to travel?', multi:true,
+    opts:[
+      {v:'solo',l:'🧍 Solo',d:'Independent, self-paced'},
+      {v:'couple',l:'💑 Couple',d:'Romantic, intimate'},
+      {v:'family',l:'👨‍👩‍👧 Family',d:'Kid-friendly, safe, accessible'},
+      {v:'friends',l:'👯 With Friends',d:'Social, fun, group activities'},
+      {v:'guided',l:'🎒 Guided Tours',d:'Organised, hassle-free'},
+    ]
+  },
+  {
+    id:'interests', q:'Any specific interests? (pick all that apply)', multi:true,
+    opts:[
+      {v:'diving',l:'🤿 Diving & Snorkelling',d:'Coral reefs, marine life'},
+      {v:'skiing',l:'⛷️ Skiing & Snow Sports',d:'Alpine resorts, powder runs'},
+      {v:'wildlife',l:'🦁 Wildlife & Safaris',d:'Big Five, birdwatching, national parks'},
+      {v:'spiritual',l:'🕌 Spiritual & Wellness',d:'Temples, yoga retreats, meditation'},
+      {v:'art',l:'🎨 Art & Architecture',d:'Galleries, design, iconic buildings'},
+      {v:'nightlife',l:'🎉 Nightlife & Parties',d:'Clubs, bars, festivals'},
+      {v:'photography',l:'📸 Photography',d:'Landscapes, street photography'},
+      {v:'none',l:'🌐 No specific interest',d:'Open to everything'},
+    ]
+  },
+  {
+    id:'avoid', q:'Anything you want to avoid?', multi:true,
+    opts:[
+      {v:'crowds',l:'😤 Crowds & Tourists',d:'Prefer off-the-beaten-path'},
+      {v:'heat',l:'🥵 Extreme Heat',d:'Avoid very hot destinations'},
+      {v:'cold_avoid',l:'🥶 Extreme Cold',d:'Avoid freezing temperatures'},
+      {v:'long_flights',l:'✈️ Very Long Flights',d:'Prefer shorter travel times'},
+      {v:'unsafe',l:'⚠️ Safety Concerns',d:'Prefer very safe destinations'},
+      {v:'nothing',l:'✅ Nothing — I\'m flexible',d:'Open to all'},
+    ]
+  },
+];
+
+let quizAnswers = {};
+let quizStep = 0;
+let quizDone = false;
+
+function renderQuiz(){
+  quizAnswers = {};
+  quizStep = 0;
+  quizDone = false;
+  return `
+  <div style="max-width:720px;margin:0 auto;padding:28px 20px">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:600;margin-bottom:6px;color:var(--text)">Find My Destination</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:28px">Answer a few questions and we'll match you with the perfect place to travel.</div>
+    <div id="quiz-body">${renderQuizStep()}</div>
+  </div>`;
+}
+
+function renderQuizStep(){
+  if(quizDone) return renderQuizResults();
+  const step = QUIZ_STEPS[quizStep];
+  const total = QUIZ_STEPS.length;
+  const pct = Math.round((quizStep/total)*100);
+  const sel = quizAnswers[step.id] || [];
+
+  return `
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text3);font-weight:600;letter-spacing:.5px">QUESTION ${quizStep+1} OF ${total}</div>
+      <div style="font-size:11px;color:var(--gold-l)">${pct}% complete</div>
+    </div>
+    <div style="height:4px;background:var(--surface2);border-radius:4px;margin-bottom:24px;overflow:hidden">
+      <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,var(--gold),var(--gold-l));border-radius:4px;transition:width .4s"></div>
+    </div>
+    <div style="font-size:19px;font-weight:600;font-family:'Cormorant Garamond',serif;margin-bottom:6px;color:var(--text)">${step.q}</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:20px">${step.multi?'Select all that apply':'Select one'}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:28px" id="quiz-opts">
+      ${step.opts.map(o=>`
+        <button class="quiz-opt${sel.includes(o.v)?' quiz-opt-sel':''}" data-val="${o.v}" onclick="quizToggle('${step.id}','${o.v}',${step.multi})" style="
+          text-align:left;padding:14px 16px;border-radius:10px;border:1.5px solid ${sel.includes(o.v)?'var(--gold)':'var(--border)'};
+          background:${sel.includes(o.v)?'var(--gold-dim)':'var(--surface)'};cursor:pointer;transition:all .15s;
+          font-family:'DM Sans',sans-serif;width:100%">
+          <div style="font-size:15px;margin-bottom:4px">${o.l}</div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.4">${o.d}</div>
+        </button>
+      `).join('')}
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      ${quizStep>0?`<button onclick="quizBack()" style="padding:10px 22px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">← Back</button>`:''}
+      <button onclick="quizNext()" style="padding:10px 28px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#0A0C0F;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">
+        ${quizStep===total-1?'Find My Match ✨':'Next →'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function quizToggle(id, val, multi){
+  if(!quizAnswers[id]) quizAnswers[id]=[];
+  if(multi){
+    const idx=quizAnswers[id].indexOf(val);
+    if(idx>-1) quizAnswers[id].splice(idx,1);
+    else quizAnswers[id].push(val);
+  } else {
+    quizAnswers[id]=[val];
+  }
+  document.getElementById('quiz-body').innerHTML=renderQuizStep();
+  bindQuizEvents();
+}
+
+function quizNext(){
+  const step=QUIZ_STEPS[quizStep];
+  if(!quizAnswers[step.id]||quizAnswers[step.id].length===0){
+    quizAnswers[step.id]=['any'];
+  }
+  if(quizStep<QUIZ_STEPS.length-1){
+    quizStep++;
+    document.getElementById('quiz-body').innerHTML=renderQuizStep();
+    bindQuizEvents();
+  } else {
+    quizDone=true;
+    // If we're on the home page (quiz embedded), re-render home to show results
+    if(S.page==='home'){
+      render();
+    } else {
+      document.getElementById('quiz-body').innerHTML=renderQuizResults();
+      bindQuizEvents();
+    }
+  }
+}
+
+function quizBack(){
+  if(quizStep>0){
+    quizStep--;
+    document.getElementById('quiz-body').innerHTML=renderQuizStep();
+    bindQuizEvents();
+  }
+}
+
+function scoreDestination(dest){
+  let score=0;
+  const a=quizAnswers;
+
+  // Climate match
+  const climateMap={
+    tropical:['Beach','Tropical','Islands','Rainforest','Diving'],
+    temperate:['Culture','History','Nature','Cycling','Food'],
+    cold:['Northern Lights','Skiing','Arctic','Mountains','Winter'],
+    dry:['Desert','Sahara','Arid','Sun'],
+    any:[]
+  };
+  const climate=a.climate?.[0]||'any';
+  if(climate!=='any'){
+    const keywords=climateMap[climate]||[];
+    if(keywords.some(k=>dest.tags?.some(t=>t.toLowerCase().includes(k.toLowerCase()))||dest.desc?.toLowerCase().includes(k.toLowerCase()))) score+=25;
+  } else { score+=10; }
+
+  // Vibe match
+  const vibeMap={
+    adventure:['Adventure','Hiking','Trekking','Extreme'],
+    culture:['Culture','History','Heritage','UNESCO','Ancient'],
+    food:['Food','Cuisine','Gastronomy','Culinary'],
+    nature:['Nature','Wildlife','National Park','Safari','Rainforest'],
+    beach:['Beach','Islands','Diving','Snorkelling','Coastal'],
+    city:['City','Urban','Nightlife','Shopping','Modern'],
+    luxury:['Luxury','5-star','Premium','Exclusive'],
+    budget:['Budget','Backpacking','Affordable'],
+  };
+  const vibes=a.vibe||[];
+  vibes.forEach(v=>{
+    const kws=vibeMap[v]||[];
+    if(kws.some(k=>dest.tags?.some(t=>t.toLowerCase().includes(k.toLowerCase()))||dest.desc?.toLowerCase().includes(k.toLowerCase()))) score+=15;
+  });
+
+  // Budget match
+  const budgetTier=a.budget_tier?.[0]||'mid';
+  const destBudget=dest.budget||'';
+  const budgetScore={
+    low: destBudget.includes('20-')||destBudget.includes('30-')||destBudget.includes('40-')||destBudget.includes('50-')||destBudget.includes('60-')||destBudget.includes('70-')||destBudget.includes('80-'),
+    mid: destBudget.includes('80-')||destBudget.includes('100-')||destBudget.includes('120-')||destBudget.includes('150-')||destBudget.includes('180-')||destBudget.includes('200-'),
+    high: destBudget.includes('200-')||destBudget.includes('250-')||destBudget.includes('300-')||destBudget.includes('350-'),
+    luxury: destBudget.includes('400-')||destBudget.includes('500-')||destBudget.includes('600-'),
+  };
+  if(budgetScore[budgetTier]) score+=20;
+
+  // Interests match
+  const interestMap={
+    diving:['Diving','Snorkelling','Reef','Marine'],
+    skiing:['Skiing','Snow','Alpine','Winter Sports'],
+    wildlife:['Wildlife','Safari','National Park','Animals'],
+    spiritual:['Spiritual','Temple','Yoga','Wellness','Buddhist','Hindu'],
+    art:['Art','Architecture','Design','Museum','Gallery'],
+    nightlife:['Nightlife','Party','Festival','Clubs'],
+    photography:['Photography','Landscape','Scenic','Views'],
+  };
+  const interests=a.interests||[];
+  interests.forEach(i=>{
+    if(i==='none') return;
+    const kws=interestMap[i]||[];
+    if(kws.some(k=>dest.tags?.some(t=>t.toLowerCase().includes(k.toLowerCase()))||dest.desc?.toLowerCase().includes(k.toLowerCase())||dest.highlights?.some(h=>h.toLowerCase().includes(k.toLowerCase())))) score+=12;
+  });
+
+  // Avoid penalties
+  const avoid=a.avoid||[];
+  if(avoid.includes('crowds')&&(dest.tags?.includes('Popular')||dest.region==='Europe')) score-=10;
+  if(avoid.includes('heat')&&(dest.tags?.some(t=>['Tropical','Desert','Hot'].includes(t)))) score-=15;
+  if(avoid.includes('cold_avoid')&&(dest.tags?.some(t=>['Arctic','Northern Lights','Skiing'].includes(t)))) score-=15;
+  if(avoid.includes('unsafe')&&dest.region==='Africa') score-=5;
+
+  return Math.max(0,score);
+}
+
+function renderQuizResults(){
+  // Score all destinations
+  const scored = ALL_DESTINATIONS.map(d=>({...d, score:scoreDestination(d)}))
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,6);
+
+  const top=scored[0];
+  const rest=scored.slice(1);
+
+  return `
+  <div>
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:40px;margin-bottom:8px">✨</div>
+      <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:600;color:var(--text);margin-bottom:6px">Your Perfect Match</div>
+      <div style="font-size:13px;color:var(--text3)">Based on your preferences, here are your top destinations</div>
+    </div>
+
+    <!-- TOP MATCH -->
+    <div style="background:linear-gradient(135deg,var(--gold-dim),var(--surface2));border:1.5px solid var(--gold);border-radius:16px;padding:24px;margin-bottom:20px;cursor:pointer" onclick="selectCountry('${top.id}')">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+        <div style="font-size:36px">${top.flag}</div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--gold-l);letter-spacing:1px;text-transform:uppercase">🏆 Best Match</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600;color:var(--text)">${top.name}</div>
+          <div style="font-size:12px;color:var(--text3)">${top.region}</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div style="font-size:22px;font-weight:700;color:var(--gold-l)">${top.score}pts</div>
+          <div style="font-size:10px;color:var(--text3)">match score</div>
+        </div>
+      </div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px">${top.desc}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+        ${(top.tags||[]).map(t=>`<span style="font-size:11px;padding:3px 10px;border-radius:20px;background:var(--gold-dim);color:var(--gold-l);border:1px solid var(--gold)">${t}</span>`).join('')}
+      </div>
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--text3);flex-wrap:wrap">
+        <span>📅 ${top.duration}</span>
+        <span>💰 ${top.budget}</span>
+        <span>🌤️ Best: ${top.best}</span>
+      </div>
+      <div style="margin-top:14px;text-align:right">
+        <span style="font-size:12px;color:var(--gold-l);font-weight:600">View full trip plan →</span>
+      </div>
+    </div>
+
+    <!-- OTHER MATCHES -->
+    <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:12px">Other great options for you</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:28px">
+      ${rest.map(d=>`
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s" onclick="selectCountry('${d.id}')" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:24px">${d.flag}</span>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">${d.name}</div>
+              <div style="font-size:10px;color:var(--text3)">${d.region}</div>
+            </div>
+            <div style="margin-left:auto;font-size:12px;font-weight:600;color:var(--gold-l)">${d.score}pts</div>
+          </div>
+          <div style="font-size:11px;color:var(--text3);line-height:1.5;margin-bottom:8px">${d.desc.slice(0,80)}...</div>
+          <div style="font-size:10px;color:var(--text3)">💰 ${d.budget}</div>
+        </div>
+      `).join('')}
+    </div>
+
+    <div style="text-align:center">
+      <button onclick="quizRestart()" style="padding:11px 28px;border-radius:8px;border:1.5px solid var(--gold);background:transparent;color:var(--gold-l);font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;margin-right:10px">↺ Retake Quiz</button>
+      <button onclick="setPage('home')" style="padding:11px 28px;border-radius:8px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold-l));color:#0A0C0F;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px">Browse All Destinations →</button>
+    </div>
+  </div>`;
+}
+
+function quizRestart(){
+  quizAnswers={};
+  quizStep=0;
+  quizDone=false;
+  if(S.page==='home'){
+    render();
+  } else {
+    document.getElementById('quiz-body').innerHTML=renderQuizStep();
+    bindQuizEvents();
+  }
+}
+
+function bindQuizEvents(){
+  // Quiz option buttons are handled via inline onclick — nothing extra needed
+}
 
 /* ════════ BUDGET ════════ */
 function renderBudget(){
